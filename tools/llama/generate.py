@@ -348,6 +348,10 @@ def load_model(checkpoint_path, device, precision, compile=False):
     logger.info(f"Restored model from checkpoint")
 
     if isinstance(model, DualARTransformer):
+        with torch.device(device):
+            model.setup_caches(
+                max_batch_size=1, max_seq_len=2048, dtype=next(model.parameters()).dtype
+            )
         decode_one_token = decode_one_token_ar
         logger.info("Using DualARTransformer")
     else:
@@ -562,8 +566,11 @@ def launch_thread_safe_queue(
             checkpoint_path, device, precision, compile=compile
         )
         with torch.device(device):
+            max_seq_len = model.config.max_seq_len if hasattr(model, "config") else 2048
             model.setup_caches(
-                max_batch_size=1, max_seq_len=2048, dtype=next(model.parameters()).dtype
+                max_batch_size=1,
+                max_seq_len=max_seq_len,
+                dtype=next(model.parameters()).dtype,
             )
         init_event.set()
 
@@ -605,7 +612,7 @@ def launch_thread_safe_queue(
     multiple=True,
 )
 @click.option("--num-samples", type=int, default=1)
-@click.option("--max-new-tokens", type=int, default=0)
+@click.option("--max-new-tokens", type=int, default=1024)
 @click.option("--top-p", type=float, default=0.7)
 @click.option("--repetition-penalty", type=float, default=1.2)
 @click.option("--temperature", type=float, default=0.7)
